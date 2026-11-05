@@ -119,9 +119,16 @@ function handlePost(PDO $pdo): void {
     $angkatan = (int)($input['angkatan'] ?? 0);
     $email = trim($input['email'] ?? '');
 
-    if (empty($npm) || empty($nama) || empty($program_studi) || empty($angkatan) || empty($email)) {
+    if (
+        $npm === '' ||
+        $nama === '' ||
+        $program_studi === '' ||
+        $angkatan < 2018 ||
+        $angkatan > 2026 ||
+        !filter_var($email, FILTER_VALIDATE_EMAIL)
+    ) {
         http_response_code(400);
-        echo json_encode(['status' => 'error', 'message' => 'Seluruh bidang isian wajib diisi.']);
+        echo json_encode(['status' => 'error', 'message' => 'Data mahasiswa tidak valid.']);
         return;
     }
 
@@ -165,15 +172,47 @@ function handlePut(PDO $pdo, ?int $id): void {
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true) ?? [];
-    $stmt = $pdo->prepare('UPDATE mahasiswa SET nama = :nama, program_studi = :prodi, angkatan = :angkatan, email = :email WHERE id = :id');
-    $stmt->execute([
-        ':id' => $id,
-        ':nama' => trim($input['nama'] ?? ''),
-        ':prodi' => trim($input['program_studi'] ?? ''),
-        ':angkatan' => (int)($input['angkatan'] ?? 0),
-        ':email' => trim($input['email'] ?? '')
-    ]);
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Format data tidak valid.']);
+        return;
+    }
+
+    $npm = trim($input['npm'] ?? '');
+    $nama = trim($input['nama'] ?? '');
+    $program_studi = trim($input['program_studi'] ?? '');
+    $angkatan = (int)($input['angkatan'] ?? 0);
+    $email = trim($input['email'] ?? '');
+
+    if (
+        $npm === '' ||
+        $nama === '' ||
+        $program_studi === '' ||
+        $angkatan < 2018 ||
+        $angkatan > 2026 ||
+        !filter_var($email, FILTER_VALIDATE_EMAIL)
+    ) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Data mahasiswa tidak valid.']);
+        return;
+    }
+
+    try {
+        $stmt = $pdo->prepare('UPDATE mahasiswa SET npm = :npm, nama = :nama, program_studi = :prodi, angkatan = :angkatan, email = :email WHERE id = :id');
+        $stmt->execute([
+            ':id' => $id,
+            ':npm' => $npm,
+            ':nama' => $nama,
+            ':prodi' => $program_studi,
+            ':angkatan' => $angkatan,
+            ':email' => $email
+        ]);
+    } catch (PDOException $e) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Gagal memperbarui data: ' . $e->getMessage()]);
+        return;
+    }
 
     http_response_code(200);
     echo json_encode(['status' => 'success', 'message' => 'Data mahasiswa berhasil diperbarui.']);
